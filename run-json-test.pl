@@ -1,71 +1,85 @@
-#!/usr/bin/env perl
-#
-# Test parser by feeding it JSON tests from the test suite.
-
-use strict;
-use warnings;
-
-use Data::Dumper;
-use Getopt::Long;
-use JSON qw(decode_json);
-
-GetOptions("stop!" => \(my $stop = 1));
-
-my $test_prog = './test-sfp';
--x $test_prog or die "$test_prog is not executable";
-
-my %header_types = ( dictionary => 0, list => 1, item => 2, );
-my $exit_status = 0;
-my $test_nr = 0;
-
-for my $json_file (@ARGV) {
-    my $json = decode_json do {
-        open my $handle, $json_file
-                or die "cannot open $json_file for reading: $!";
-        local $/;
-        <$handle>;
-    };
-    die "json object in $json_file is not an array"
-        if ref($json) ne 'ARRAY';
-    for my $item (@$json) {
-        unless ('ARRAY' eq ref $$item{raw}) {
-            die "unexpected raw: " . Dumper($item);
-        }
-        my $data;
-        if (@{$$item{raw}} > 1) {
-            die "can item be split? ". Dumper($item) if 'item' eq $$item{header_type};
-            $data = join ', ', @{$$item{raw}};
-        } else {
-            $data = $$item{raw}[0];
-        }
-        my $fail =  $$item{must_fail} ? "must" :
-                    $$item{may_fail} ? "may" :
-                    "no";
-        my $type = $header_types{$$item{header_type}};
-        ++$test_nr;
-        print "test #$test_nr; named `$$item{name}'; fail: $fail, ",
-            "type: $type; data: [", $data =~ s/\t/\\t/gr, "]\n";
-        my $status;
-        if ($data !~ /\x00/) {
-            $status = system($test_prog, $type, $data);
-        } else {
-            $data = join '', map { sprintf "\\x%02X", ord } split //, $data;
-            $status = system("echo -ne '$data' | $test_prog $type");
-        }
-        if ($fail eq 'must') {
-            $status = not $status;
-        } elsif ($fail eq 'may') {
-            $status = 0;     # Who cares right? XXX
-        }
-        if ($status == 0) {
-            print "OK\n";
-        } else {
-            print "FAIL\n";
-        }
-        print "\n";
-        exit 1 if $status and $stop;
-        $exit_status |= !!$status;
+[
+  {
+    "type": "newPage",
+    "config": {}
+  },
+  {
+    "type": "javaScript",
+    "config": {
+      "params": [
+        "Persona_ID",
+        "Media_URL",
+        "browser_name"
+      ],
+      "content": "{\n  \"name\": \"Social Media Auto-Poster\",\n  \"type\": \"rpa\",\n  \"version\": \"1.0.0\",\n  \"commands\": [\n    {\n      \"command\": \"open\",\n      \"args\": [\"https://docs.google.com/spreadsheets/d/1v4wd5pM_4y21RmJR1laBPE1bTUs_TFpxpB_0230JD00/edit#gid=0\"],\n      \"target\": \"current\",\n      \"value\": \"\"\n    },\n    {\n      \"command\": \"wait_visible\",\n      \"args\": [\"div[aria-label='A2']\"],\n      \"target\": \"css\",\n      \"value\": \"\",\n      \"description\": \"Wait for sheet to load\"\n    },\n    {\n      \"command\": \"store_value\",\n      \"args\": [\"{{profile.name}}\"],\n      \"target\": \"\",\n      \"value\": \"current_persona\",\n      \"description\": \"Get current browser profile ID\"\n    },\n    {\n      \"command\": \"for\",\n      \"args\": [\"row\", \"2\", \"100\", \"1\"],\n      \"target\": \"\",\n      \"value\": \"\",\n      \"subCommands\": [\n        {\n          \"command\": \"get_text\",\n          \"args\": [\"div[aria-label='A{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"persona_id\"\n        },\n        {\n          \"command\": \"if\",\n          \"args\": [\"{{persona_id}} != {{current_persona}}\"],\n          \"target\": \"\",\n          \"value\": \"\",\n          \"subCommands\": [\n            {\n              \"command\": \"continue\",\n              \"args\": [],\n              \"target\": \"\",\n              \"value\": \"\"\n            }\n          ]\n        },\n        {\n          \"command\": \"get_text\",\n          \"args\": [\"div[aria-label='B{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"platform\"\n        },\n        {\n          \"command\": \"if\",\n          \"args\": [\"{{platform}} == ''\"],\n          \"target\": \"\",\n          \"value\": \"\",\n          \"subCommands\": [\n            {\n              \"command\": \"continue\",\n              \"args\": [],\n              \"target\": \"\",\n              \"value\": \"\"\n            }\n          ]\n        },\n        {\n          \"command\": \"get_text\",\n          \"args\": [\"div[aria-label='C{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"media_url\"\n        },\n        {\n          \"command\": \"get_text\",\n          \"args\": [\"div[aria-label='D{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"caption\"\n        },\n        {\n          \"command\": \"download_file\",\n          \"args\": [\"{{media_url}}\", \"{{download_dir}}/media_{{timestamp}}{{media_url | extension}}\"],\n          \"target\": \"\",\n          \"value\": \"local_media_path\"\n        },\n        {\n          \"command\": \"switch\",\n          \"args\": [\"{{platform}}\"],\n          \"target\": \"\",\n          \"value\": \"\",\n          \"subCommands\": [\n            {\n              \"command\": \"case\",\n              \"args\": [\"Facebook\"],\n              \"target\": \"\",\n              \"value\": \"\",\n              \"subCommands\": [\n                {\n                  \"command\": \"open\",\n                  \"args\": [\"https://www.facebook.com\"],\n                  \"target\": \"new_tab\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[aria-label='Create a post']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"div[aria-label='Photo/Video']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"set_files\",\n                  \"args\": [\"input[type='file']\", \"{{local_media_path}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[aria-label='Remove']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\",\n                  \"timeout\": \"30s\"\n                },\n                {\n                  \"command\": \"set_value\",\n                  \"args\": [\"div[aria-label='Create a post']\", \"{{caption}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"div[aria-label='Post'][role='button']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"a[aria-label*='Your post']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\",\n                  \"timeout\": \"60s\"\n                },\n                {\n                  \"command\": \"get_attribute\",\n                  \"args\": [\"a[aria-label*='Your post']\", \"href\"],\n                  \"target\": \"css\",\n                  \"value\": \"post_url\"\n                }\n              ]\n            },\n            {\n              \"command\": \"case\",\n              \"args\": [\"Instagram\"],\n              \"target\": \"\",\n              \"value\": \"\",\n              \"subCommands\": [\n                {\n                  \"command\": \"open\",\n                  \"args\": [\"https://www.instagram.com/create/post/\"],\n                  \"target\": \"new_tab\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"set_files\",\n                  \"args\": [\"input[type='file']\", \"{{local_media_path}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[aria-label='Next']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"div[aria-label='Next']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[aria-label='Next']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"div[aria-label='Next']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"set_value\",\n                  \"args\": [\"div[aria-label='Write a caption...']\", \"{{caption}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"div[aria-label='Share']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"header time + a\"],\n                  \"target\": \"css\",\n                  \"value\": \"\",\n                  \"timeout\": \"60s\"\n                },\n                {\n                  \"command\": \"get_attribute\",\n                  \"args\": [\"header time + a\", \"href\"],\n                  \"target\": \"css\",\n                  \"value\": \"post_url\"\n                }\n              ]\n            },\n            {\n              \"command\": \"case\",\n              \"args\": [\"X\"],\n              \"target\": \"\",\n              \"value\": \"\",\n              \"subCommands\": [\n                {\n                  \"command\": \"open\",\n                  \"args\": [\"https://twitter.com/compose/tweet\"],\n                  \"target\": \"new_tab\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"input[data-testid='fileInput']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"set_files\",\n                  \"args\": [\"input[data-testid='fileInput']\", \"{{local_media_path}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[data-testid='tweetTextarea_0']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"set_value\",\n                  \"args\": [\"div[data-testid='tweetTextarea_0']\", \"{{caption}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"div[data-testid='tweetButton']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"a[href*='/status/'] time\"],\n                  \"target\": \"css\",\n                  \"value\": \"\",\n                  \"timeout\": \"60s\"\n                },\n                {\n                  \"command\": \"get_attribute\",\n                  \"args\": [\"a[href*='/status/'][aria-label]\", \"href\"],\n                  \"target\": \"css\",\n                  \"value\": \"post_url\"\n                }\n              ]\n            },\n            {\n              \"command\": \"case\",\n              \"args\": [\"TikTok\"],\n              \"target\": \"\",\n              \"value\": \"\",\n              \"subCommands\": [\n                {\n                  \"command\": \"open\",\n                  \"args\": [\"https://www.tiktok.com/upload?lang=en\"],\n                  \"target\": \"new_tab\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"input[type='file']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"set_files\",\n                  \"args\": [\"input[type='file']\", \"{{local_media_path}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[data-e2e='video-upload']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\",\n                  \"timeout\": \"120s\"\n                },\n                {\n                  \"command\": \"set_value\",\n                  \"args\": [\"div[contenteditable='true']\", \"{{caption}}\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"click\",\n                  \"args\": [\"button[data-e2e='btn-post']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\"\n                },\n                {\n                  \"command\": \"wait_visible\",\n                  \"args\": [\"div[data-e2e='browse-video']\"],\n                  \"target\": \"css\",\n                  \"value\": \"\",\n                  \"timeout\": \"120s\"\n                },\n                {\n                  \"command\": \"get_url\",\n                  \"args\": [],\n                  \"target\": \"\",\n                  \"value\": \"post_url\"\n                }\n              ]\n            }\n          ]\n        },\n        {\n          \"command\": \"switch_tab\",\n          \"args\": [\"first\"],\n          \"target\": \"\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"double_click\",\n          \"args\": [\"div[aria-label='E{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"set_value\",\n          \"args\": [\"textarea\", \"Posted\"],\n          \"target\": \"css\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"press\",\n          \"args\": [\"Enter\"],\n          \"target\": \"\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"double_click\",\n          \"args\": [\"div[aria-label='F{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"set_value\",\n          \"args\": [\"textarea\", \"{{timestamp}}\"],\n          \"target\": \"css\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"press\",\n          \"args\": [\"Enter\"],\n          \"target\": \"\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"double_click\",\n          \"args\": [\"div[aria-label='H{{row}}']\"],\n          \"target\": \"css\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"set_value\",\n          \"args\": [\"textarea\", \"{{post_url}}\"],\n          \"target\": \"css\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"press\",\n          \"args\": [\"Enter\"],\n          \"target\": \"\",\n          \"value\": \"\"\n        },\n        {\n          \"command\": \"close_tab\",\n          \"args\": [],\n          \"target\": \"\",\n          \"value\": \"\"\n        }\n      ]\n    }\n  ]\n}",
+      "variable": "",
+      "remark": ""
     }
-}
-
-exit $exit_status;
+  },
+  {
+    "type": "googleSheet",
+    "config": {
+      "type": "read",
+      "sheetId": "1v4wd5pM_4y21RmJR1laBPE1bTUs_TFpxpB_0230JD00/edit?gid=0#gid=0",
+      "sheetName": "Sheet1",
+      "rangeType": "custom",
+      "range": "Sheet1A2:1",
+      "template": "",
+      "isKey": "1",
+      "variable": "Persona_ID",
+      "remark": "",
+      "apiKey": ""
+    }
+  },
+  {
+    "type": "googleSheet",
+    "config": {
+      "type": "read",
+      "sheetId": "1v4wd5pM_4y21RmJR1laBPE1bTUs_TFpxpB_0230JD00/edit?gid=0#gid=0",
+      "sheetName": "Sheet1",
+      "rangeType": "custom",
+      "range": "Sheet1C2:1",
+      "template": "",
+      "isKey": "1",
+      "variable": "Media_URL",
+      "remark": "",
+      "apiKey": "",
+      "_copyItemIndex": "0_2",
+      "_copyItemType": ""
+    }
+  },
+  {
+    "type": "ifElse",
+    "config": {
+      "condition": [
+        "browser_name"
+      ],
+      "relation": "equal",
+      "result": "${Persona_ID}",
+      "hiddenChildren": true,
+      "children": [],
+      "remark": ""
+    }
+  },
+  {
+    "type": "javaScript",
+    "config": {
+      "params": [
+        "Persona_ID",
+        "Media_URL"
+      ],
+      "content": "// Sample Pseudocode:\n\n// Define the current browser's identifier (e.g., the profile name is \"7\")\nvar currentProfileId = \"7\";\n\n// Read all rows from the configured Google Sheet range\nvar sheetData = googleSheet.read({\n    spreadsheetId: \"YOUR_SPREADSHEET_ID\",\n    worksheetName: \"YOUR_WORKSHEET_NAME\",\n    scope: \"A2:I\",\n});\n\n// Loop through each row from the sheet\nfor (var i = 0; i < sheetData.length; i++) {\n    var row = sheetData[i];\n    // Assuming row[\"A\"] contains Persona_ID and row[\"C\"] holds Media_URL\n    if (row[\"A\"] === currentProfileId) {\n        var mediaUrl = row[\"C\"];\n        // Proceed to download the media from mediaUrl\n        downloadMedia(mediaUrl);\n        // Optionally, break if only one row per browser is expected\n        break;\n    }\n}",
+      "variable": "",
+      "remark": ""
+    }
+  },
+  {
+    "type": "javaScript",
+    "config": {
+      "params": [],
+      "content": "// Sample Pseudocode:\n\n// Define the current browser's identifier (e.g., the profile name is \"7\")\nvar currentProfileId = \"7\";\n\n// Read all rows from the configured Google Sheet range\nvar sheetData = googleSheet.read({\n    spreadsheetId: \"YOUR_SPREADSHEET_ID\",\n    worksheetName: \"YOUR_WORKSHEET_NAME\",\n    scope: \"A2:I\",\n});\n\n// Loop through each row from the sheet\nfor (var i = 0; i < sheetData.length; i++) {\n    var row = sheetData[i];\n    // Assuming row[\"A\"] contains Persona_ID and row[\"C\"] holds Media_URL\n    if (row[\"A\"] === currentProfileId) {\n        var mediaUrl = row[\"C\"];\n        // Proceed to download the media from mediaUrl\n        downloadMedia(mediaUrl);\n        // Optionally, break if only one row per browser is expected\n        break;\n    }\n}",
+      "variable": "",
+      "remark": ""
+    }
+  }
+]
